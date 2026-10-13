@@ -1,0 +1,1032 @@
+<title>Shift Pay Check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<meta name="theme-color" content="#16324a">
+<style>
+/* Layout: single phone column, timecard-style. Sticky tab bar at bottom; one card per job (log, review, payslip). */
+:root {
+  --bg: #eef2f5;
+  --surface: #ffffff;
+  --ink: #142433;
+  --muted: #5b6b7a;
+  --line: #d5dde4;
+  --accent: #16507a;
+  --accent-ink: #ffffff;
+  --accent-soft: #dceaf4;
+  --warn: #9a4b00;
+  --warn-soft: #fdeedd;
+  --good: #1d6b43;
+  --good-soft: #def2e6;
+  --bad: #a3242c;
+  --bad-soft: #fbe3e4;
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Atkinson Hyperlegible", system-ui, -apple-system, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1620; --surface: #15212d; --ink: #e5edf3; --muted: #93a4b3; --line: #273746;
+    --accent: #6fb3e6; --accent-ink: #08131c; --accent-soft: #1b3346;
+    --warn: #f0a75c; --warn-soft: #3a2914; --good: #6fcf97; --good-soft: #15301f;
+    --bad: #f08a90; --bad-soft: #3a1a1d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1620; --surface: #15212d; --ink: #e5edf3; --muted: #93a4b3; --line: #273746;
+  --accent: #6fb3e6; --accent-ink: #08131c; --accent-soft: #1b3346;
+  --warn: #f0a75c; --warn-soft: #3a2914; --good: #6fcf97; --good-soft: #15301f;
+  --bad: #f08a90; --bad-soft: #3a1a1d; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); }
+body { color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.45; }
+.wrap { max-width: 560px; margin: 0 auto; padding-inline: 16px; padding-block: 18px 110px; display: grid; gap: 16px; }
+header.top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--f-display); font-weight: 800; font-size: 1.7rem; letter-spacing: -0.01em; margin: 0; }
+h2 { font-family: var(--f-display); font-weight: 600; font-size: 1.2rem; margin: 0; text-wrap: balance; }
+.sync { font-size: 0.78rem; color: var(--muted); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: grid; gap: 14px; min-width: 0; }
+.label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 700; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field { display: grid; gap: 6px; min-width: 0; }
+input[type=date], input[type=time], input[type=number], input[type=text] {
+  width: 100%; font: inherit; font-family: var(--f-mono); font-size: 1.05rem; color: var(--ink);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 11px 10px; min-height: 48px;
+}
+input:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+button { font: inherit; cursor: pointer; }
+.opt {
+  min-height: 46px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--ink); font-weight: 700;
+}
+.opt[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.chip { font-family: var(--f-mono); min-width: 58px; }
+.primary { min-height: 52px; border: 0; border-radius: 10px; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 1.05rem; }
+.ghost { min-height: 44px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); padding: 8px 14px; font-weight: 700; }
+.danger { color: var(--bad); border-color: var(--bad); }
+.btns { display: flex; gap: 10px; flex-wrap: wrap; }
+.btns .primary { flex: 1 1 200px; }
+.hint { font-size: 0.86rem; color: var(--muted); margin: 0; }
+
+/* Live calculation — the timecard strip */
+.calc { border: 1px dashed var(--line); border-radius: 8px; padding: 12px; display: grid; gap: 8px; }
+.calc-line { display: flex; justify-content: space-between; gap: 12px; font-size: 0.95rem; }
+.calc-line b, .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.calc-total { border-top: 1px solid var(--line); padding-top: 8px; font-weight: 700; font-size: 1.05rem; }
+.notice { border-radius: 8px; padding: 10px 12px; font-size: 0.93rem; }
+.notice.warn { background: var(--warn-soft); color: var(--warn); }
+.notice.good { background: var(--good-soft); color: var(--good); }
+.notice.bad { background: var(--bad-soft); color: var(--bad); }
+
+/* Summary */
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.stat { background: var(--bg); border-radius: 8px; padding: 10px; min-width: 0; }
+.stat .v { font-family: var(--f-mono); font-weight: 700; font-size: 1.1rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.stat .k { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.stat.alert .v { color: var(--warn); }
+
+/* Shift list */
+.week-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.list { display: grid; gap: 0; }
+.shift { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 12px 0; border-top: 1px solid var(--line); align-items: center; }
+.shift:first-child { border-top: 0; }
+.shift .d { font-weight: 700; }
+.shift .t { font-family: var(--f-mono); font-size: 0.9rem; color: var(--muted); }
+.shift .h { font-family: var(--f-mono); font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.pills { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pill { font-size: 0.75rem; font-weight: 700; padding: 3px 9px; border-radius: 99px; }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.good { background: var(--good-soft); color: var(--good); }
+.pill.plain { background: var(--bg); color: var(--muted); }
+.link { background: none; border: 0; color: var(--accent); font-weight: 700; padding: 6px 4px; min-height: 36px; }
+
+.diff { font-family: var(--f-mono); font-weight: 700; }
+.empty { text-align: center; padding: 24px 8px; color: var(--muted); }
+.empty h2 { color: var(--ink); margin-bottom: 6px; }
+
+/* Bottom tab bar */
+nav.tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+  background: var(--surface); border-top: 1px solid var(--line);
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px;
+}
+.timer { font-family: var(--f-mono); font-weight: 700; font-size: 2.6rem; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1; }
+.clock.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.clock.brk { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn) inset; }
+.clock.brk .timer { color: var(--warn); }
+.btns .warnbtn { flex: 1 1 140px; min-height: 52px; border: 0; border-radius: 10px; background: var(--warn); color: var(--surface); font-weight: 700; font-size: 1.05rem; }
+.btns .ghost.big { flex: 1 1 140px; min-height: 52px; font-size: 1.05rem; }
+select { width: 100%; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 11px 10px; min-height: 48px; }
+
+/* Report preview — reads like the paper it becomes */
+.doc { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 20px 16px; display: grid; gap: 14px; min-width: 0; }
+.doc h3 { font-family: var(--f-display); font-weight: 800; font-size: 1.3rem; margin: 0; }
+.doc dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; font-size: 0.92rem; }
+.doc dt { color: var(--muted); }
+.doc dd { margin: 0; font-weight: 700; }
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; }
+.doc table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 0.85rem; }
+.doc th, .doc td { padding: 8px 8px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.doc th { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); background: var(--bg); }
+.doc td.n { font-family: var(--f-mono); font-variant-numeric: tabular-nums; text-align: right; }
+.doc tr.off td { color: var(--muted); }
+.doc tr.tot td { font-weight: 700; border-bottom: 0; background: var(--bg); }
+.doc td.flag { color: var(--warn); font-weight: 700; white-space: normal; min-width: 160px; }
+.doc .foot { font-size: 0.82rem; color: var(--muted); margin: 0; }
+nav.tabs button {
+  background: none; border: 0; border-radius: 8px; padding: 8px 4px; min-height: 52px;
+  color: var(--muted); font-weight: 700; font-size: 0.82rem; display: grid; justify-items: center; gap: 2px;
+}
+nav.tabs button svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+nav.tabs button[aria-current="page"] { color: var(--accent); background: var(--accent-soft); }
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-weight: 700; z-index: 6; max-width: calc(100% - 32px);
+}
+@media (prefers-reduced-motion: no-preference) { .toast { animation: up .2s ease-out; } @keyframes up { from { transform: translate(-50%, 8px); opacity: 0; } } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1>Shift Pay Check</h1>
+    <span class="sync" id="sync">Saved on this device</span>
+  </header>
+
+  <!-- LOG -->
+  <div id="view-log" style="display:grid;gap:16px">
+  <section class="card clock" id="clock" aria-labelledby="clock-h">
+    <div class="week-h"><h2 id="clock-h">Clock</h2><span class="pill plain" id="clock-state">Not clocked in</span></div>
+    <div class="timer" id="clock-timer" aria-live="off">0:00:00</div>
+    <p class="hint" id="clock-sub">Tap Clock in when your shift starts. Times are rounded to the nearest 15 minutes and you can change them before saving.</p>
+    <div class="field" id="clock-edit-wrap" hidden>
+      <label class="label" for="clock-in-edit">Clocked in at (change if you forgot to tap)</label>
+      <input type="time" id="clock-in-edit">
+    </div>
+    <div class="btns" id="clock-btns"></div>
+  </section>
+  <section class="card" aria-labelledby="log-h">
+    <h2 id="log-h">Log a shift</h2>
+    <div class="field">
+      <label class="label" for="f-date">Date</label>
+      <input type="date" id="f-date">
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label class="label" for="f-start">Started</label>
+        <input type="time" id="f-start" value="06:00">
+      </div>
+      <div class="field">
+        <label class="label" for="f-end">Finished</label>
+        <input type="time" id="f-end" value="14:30">
+      </div>
+    </div>
+    <div class="field">
+      <span class="label" id="brk-q">Did you take a break?</span>
+      <div class="seg" role="group" aria-labelledby="brk-q">
+        <button type="button" class="opt" id="brk-yes" aria-pressed="true">Yes</button>
+        <button type="button" class="opt" id="brk-no" aria-pressed="false">No break</button>
+      </div>
+    </div>
+    <div class="field" id="brk-len-wrap">
+      <span class="label" id="brk-len-l">How long was it?</span>
+      <div class="chips" role="group" aria-labelledby="brk-len-l" id="brk-chips"></div>
+      <div class="row2">
+        <div class="field">
+          <label class="label" for="f-brk">Minutes</label>
+          <input type="number" id="f-brk" inputmode="numeric" min="0" max="240" step="1" value="30">
+        </div>
+      </div>
+    </div>
+    <div class="field">
+      <label class="label" for="f-note">Note (optional)</label>
+      <input type="text" id="f-note" placeholder="e.g. covered till 2, asked Sam to fix break">
+    </div>
+
+    <div class="notice good" id="from-clock" hidden></div>
+    <div class="calc" id="calc" aria-live="polite"></div>
+
+    <div class="btns">
+      <button type="button" class="primary" id="save">Save shift</button>
+      <button type="button" class="ghost" id="cancel-edit" hidden>Cancel edit</button>
+    </div>
+  </section>
+  <div id="weekly" style="display:grid;gap:16px"></div>
+  </div>
+
+  <!-- SHIFTS -->
+  <section id="view-shifts" hidden>
+    <div style="display:grid;gap:16px" id="shift-weeks"></div>
+  </section>
+
+  <!-- PAYSLIP -->
+  <section id="view-pay" hidden>
+    <div class="card">
+      <h2>Check your payslip</h2>
+      <p class="hint">Type in the hours your payslip says you were paid for each week. The app compares it with what you actually worked.</p>
+    </div>
+    <div style="display:grid;gap:16px;margin-top:16px" id="pay-weeks"></div>
+  </section>
+
+  <!-- REPORT -->
+  <section id="view-report" hidden>
+    <div class="card">
+      <h2>Weekly report</h2>
+      <p class="hint">A Sunday–Saturday report of every shift, with start and finish times and whether you took a break, ready to send to your manager or HR.</p>
+      <div class="field">
+        <label class="label" for="r-week">Week</label>
+        <select id="r-week"></select>
+      </div>
+      <div class="btns">
+        <button type="button" class="primary" id="r-pdf" hidden>Download PDF</button>
+        <button type="button" class="ghost" id="r-share" hidden>Share</button>
+        <button type="button" class="ghost" id="r-copy">Copy as text</button>
+      </div>
+      <p class="hint" id="r-hint">Copy as text pastes neatly into an email, Teams or WhatsApp.</p>
+    </div>
+    <div class="doc" id="r-preview" style="margin-top:16px"></div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="view-set" class="card" hidden aria-labelledby="set-h">
+    <h2 id="set-h">Settings</h2>
+    <span class="label">For your reports</span>
+    <div class="row2">
+      <div class="field">
+        <label class="label" for="s-name">Your name</label>
+        <input type="text" id="s-name" autocomplete="name">
+      </div>
+      <div class="field">
+        <label class="label" for="s-emp">Employee no. (optional)</label>
+        <input type="text" id="s-emp">
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label class="label" for="s-site">Site (optional)</label>
+        <input type="text" id="s-site">
+      </div>
+      <div class="field">
+        <label class="label" for="s-rate">Hourly rate (£)</label>
+        <input type="number" id="s-rate" inputmode="decimal" step="0.01" min="0" placeholder="12.21">
+      </div>
+    </div>
+    <span class="label">Auto break rules</span>
+    <div class="row2">
+      <div class="field">
+        <label class="label" for="s-lf">Long shift from (h)</label>
+        <input type="number" id="s-lf" inputmode="decimal" step="0.5" min="0" value="8">
+      </div>
+      <div class="field">
+        <label class="label" for="s-lb">Break taken off (min)</label>
+        <input type="number" id="s-lb" inputmode="numeric" step="1" min="0" value="60">
+      </div>
+      <div class="field">
+        <label class="label" for="s-sf">Shorter shift from (h)</label>
+        <input type="number" id="s-sf" inputmode="decimal" step="0.5" min="0" value="5">
+      </div>
+      <div class="field">
+        <label class="label" for="s-sb">Break taken off (min)</label>
+        <input type="number" id="s-sb" inputmode="numeric" step="1" min="0" value="30">
+      </div>
+    </div>
+    <div class="field">
+      <label class="label" for="s-round">Round clock times to nearest</label>
+      <select id="s-round">
+        <option value="0">Don't round</option>
+        <option value="5">5 minutes</option>
+        <option value="10">10 minutes</option>
+        <option value="15">15 minutes</option>
+        <option value="30">30 minutes</option>
+      </select>
+    </div>
+    <p class="hint" id="rule-hint">8h or more: 60 min taken off. 5h to under 8h: 30 min. Under 5h: no break. If you didn't take the break, the app tells you how much to ask for back.</p>
+    <div class="row2">
+      <div class="field">
+        <span class="label" id="wk-l">Pay week starts</span>
+        <div class="seg" role="group" aria-labelledby="wk-l">
+          <button type="button" class="opt" id="wk-sun" aria-pressed="true">Sun</button>
+          <button type="button" class="opt" id="wk-mon" aria-pressed="false">Mon</button>
+        </div>
+      </div>
+    </div>
+    <button type="button" class="primary" id="s-save">Save settings</button>
+    <span class="label">Backup</span>
+    <p class="hint">Save all your shifts to a file, or load them from one. Use this to move your data to a new phone or between the web and Android versions. Importing adds to what's here and never deletes anything.</p>
+    <div class="btns">
+      <button type="button" class="ghost" id="b-export" hidden>Export backup</button>
+      <button type="button" class="ghost" id="b-import">Import backup</button>
+    </div>
+    <input type="file" id="b-file" accept="application/json,.json" hidden>
+    <p class="hint" id="install-hint">To use it like an app: open this page in Chrome on your phone, tap ⋮ then "Add to Home screen".</p>
+  </section>
+</div>
+
+<nav class="tabs" aria-label="Sections">
+  <button type="button" data-view="log" aria-current="page"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Log</button>
+  <button type="button" data-view="shifts"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Shifts</button>
+  <button type="button" data-view="pay"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Payslip</button>
+  <button type="button" data-view="report"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h6"/></svg>Report</button>
+  <button type="button" data-view="set"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg>Settings</button>
+</nav>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  // Auto break rules: 8h+ shift → 60 min, 5h to under 8h → 30 min, under 5h → none.
+  const DEFAULT_SETTINGS = { rate: null, round: 15, longFrom: 8, longBreak: 60, shortFrom: 5, shortBreak: 30, weekStart: 0, v: 3 };
+  const norm = (s) => {
+    const o = { ...DEFAULT_SETTINGS, ...(s || {}) };
+    if (o.v !== 3) { o.weekStart = 0; o.longFrom = 8; o.longBreak = 60; o.shortFrom = 5; o.shortBreak = 30; o.v = 3; }
+    delete o.autoBreak; delete o.autoMinHours;
+    return o;
+  };
+  function autoBreakFor(durMin) {
+    if (durMin >= (Number(settings.longFrom) || 0) * 60) return Number(settings.longBreak) || 0;
+    if (durMin >= (Number(settings.shortFrom) || 0) * 60) return Number(settings.shortBreak) || 0;
+    return 0;
+  }
+
+  // ---------- state ----------
+  let settings = { ...DEFAULT_SETTINGS };
+  let shifts = [];          // {id,date,start,end,breakTaken,breakMins,fixed,note}
+  let paid = {};            // weekKey -> hours on payslip
+  let editingId = null;
+  let breakTaken = true;
+  let backend = "local";    // "local" | "db"
+  let refs = null;          // db refs when cloud sync is on
+
+  // ---------- local storage fallback ----------
+  const LS = "shiftpaycheck:v1";
+  // In the Android app, storage, sharing, files and notifications go through the native bridge.
+  const Native = window.AndroidBridge || null;
+  const store = {
+    get(k) { try { return Native ? Native.getItem(k) : localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { Native ? Native.setItem(k, v) : localStorage.setItem(k, v); } catch (e) {} },
+    del(k) { try { Native ? Native.removeItem(k) : localStorage.removeItem(k); } catch (e) {} },
+  };
+  function loadLocal() {
+    try {
+      const raw = store.get(LS);
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      settings = norm(d.settings);
+      shifts = Array.isArray(d.shifts) ? d.shifts : [];
+      paid = d.paid || {};
+    } catch (e) {}
+  }
+  function saveLocal() {
+    store.set(LS, JSON.stringify({ settings, shifts, paid }));
+  }
+
+  // ---------- time maths ----------
+  const toMin = (hhmm) => { const [h, m] = String(hhmm || "0:0").split(":").map(Number); return (h || 0) * 60 + (m || 0); };
+  function duration(start, end) { let d = toMin(end) - toMin(start); if (d <= 0) d += 1440; return d; }
+  const fmtHM = (min) => { const s = min < 0 ? "−" : ""; min = Math.abs(Math.round(min)); return `${s}${Math.floor(min / 60)}h ${String(min % 60).padStart(2, "0")}m`; };
+  const fmtDec = (min) => (min / 60).toFixed(2);
+  const money = (n) => (n < 0 ? "−£" : "£") + Math.abs(n).toFixed(2);
+
+  function calc(s) {
+    const dur = duration(s.start, s.end);
+    const actualBreak = s.breakTaken ? Math.max(0, Number(s.breakMins) || 0) : 0;
+    const worked = Math.max(0, dur - actualBreak);
+    const auto = autoBreakFor(dur);
+    const systemPays = Math.max(0, dur - auto);    // what clocking shows if nobody fixes it
+    const gap = worked - systemPays;               // +ve = you're owed if not fixed
+    return { dur, actualBreak, worked, auto, systemPays, gap };
+  }
+
+  // ---------- weeks ----------
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const parseDate = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+  function weekKey(dateStr) {
+    const d = parseDate(dateStr);
+    const back = (d.getDay() - settings.weekStart + 7) % 7;
+    d.setDate(d.getDate() - back);
+    return iso(d);
+  }
+  const dayName = (s) => parseDate(s).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  const weekLabel = (k) => { const a = parseDate(k), b = parseDate(k); b.setDate(b.getDate() + 6);
+    const o = { weekday: "short", day: "numeric", month: "short" }; return `${a.toLocaleDateString("en-GB", o)} – ${b.toLocaleDateString("en-GB", o)}`; };
+  const weekEnd = (k) => { const b = parseDate(k); b.setDate(b.getDate() + 6); return iso(b); };
+  const weekDone = (k) => iso(new Date()) > weekEnd(k);
+  const statusPill = (k) => weekDone(k) ? `<span class="pill good">Week complete</span>` : `<span class="pill plain">In progress</span>`;
+  function weekTotals(list) {
+    let worked = 0, dur = 0, brk = 0, atRisk = 0;
+    list.forEach((s) => { const c = calc(s); worked += c.worked; dur += c.dur; brk += c.actualBreak; if (c.gap > 0 && !s.fixed) atRisk += c.gap; });
+    return { worked, dur, brk, atRisk, count: list.length };
+  }
+
+  // Summary of the last finished week and the week in progress, shown on the Log tab.
+  function renderWeekly() {
+    const today = iso(new Date());
+    const thisK = weekKey(today);
+    const lastDate = parseDate(thisK); lastDate.setDate(lastDate.getDate() - 1);
+    const lastK = weekKey(iso(lastDate));
+    const byWeek = new Map(groupWeeks());
+    const block = (k, title, done) => {
+      const list = byWeek.get(k) || [];
+      const t = weekTotals(list);
+      const p = paid[k];
+      let check = "";
+      if (done && list.length) {
+        if (p === undefined) check = `<div class="notice warn">When your payslip arrives, enter the hours on the Payslip tab to check this week.</div>`;
+        else { const d = t.worked - Number(p) * 60;
+          check = Math.abs(d) < 1 ? `<div class="notice good"><b>Paid correctly</b> for this week.</div>`
+            : d > 0 ? `<div class="notice warn"><b>Underpaid by ${fmtHM(d)}${settings.rate ? ` (${money(d / 60 * settings.rate)})` : ""}.</b></div>`
+            : `<div class="notice bad">Payslip shows ${fmtHM(-d)} more than you logged.</div>`; }
+      }
+      return `<div class="card">
+        <div class="week-h"><h2>${title}</h2>${done ? `<span class="pill good">Week complete</span>` : `<span class="pill plain">So far</span>`}</div>
+        <p class="hint" style="margin-top:-8px">${weekLabel(k)}</p>
+        ${list.length ? `<div class="stats">
+          <div class="stat"><div class="v">${fmtDec(t.worked)}h</div><div class="k">${t.count} shift${t.count > 1 ? "s" : ""} paid</div></div>
+          <div class="stat"><div class="v">${settings.rate ? money(t.worked / 60 * settings.rate) : "—"}</div><div class="k">Should earn</div></div>
+          <div class="stat ${t.atRisk ? "alert" : ""}"><div class="v">${t.atRisk ? fmtHM(t.atRisk) : "0"}</div><div class="k">Breaks to fix</div></div>
+        </div>${settings.rate ? "" : `<p class="hint">Add your hourly rate in Settings to see pay in £.</p>`}${check}`
+        : `<p class="hint">No shifts logged for this week.</p>`}
+      </div>`;
+    };
+    $("weekly").innerHTML = block(lastK, "Last week", true) + block(thisK, "This week", false);
+  }
+
+  function groupWeeks() {
+    const map = new Map();
+    [...shifts].sort((a, b) => (b.date + b.start).localeCompare(a.date + a.start)).forEach((s) => {
+      const k = weekKey(s.date);
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push(s);
+    });
+    return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  }
+
+  // ---------- form ----------
+  const BREAK_OPTIONS = [15, 20, 30, 45, 60];
+  function renderChips() {
+    const cur = Number($("f-brk").value);
+    $("brk-chips").innerHTML = BREAK_OPTIONS.map((m) =>
+      `<button type="button" class="opt chip" data-m="${m}" aria-pressed="${m === cur}">${m}m</button>`).join("");
+  }
+  $("brk-chips").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-m]"); if (!b) return;
+    $("f-brk").value = b.dataset.m; renderChips(); renderCalc();
+  });
+  function setBreak(on) {
+    breakTaken = on;
+    $("brk-yes").setAttribute("aria-pressed", on); $("brk-no").setAttribute("aria-pressed", !on);
+    $("brk-len-wrap").hidden = !on; renderCalc();
+  }
+  $("brk-yes").onclick = () => setBreak(true);
+  $("brk-no").onclick = () => setBreak(false);
+  ["f-date", "f-start", "f-end", "f-brk"].forEach((id) => $(id).addEventListener("input", () => { renderChips(); renderCalc(); }));
+
+  function formShift() {
+    return { date: $("f-date").value, start: $("f-start").value, end: $("f-end").value,
+      breakTaken, breakMins: breakTaken ? Number($("f-brk").value) || 0 : 0, note: $("f-note").value.trim() };
+  }
+
+  function renderCalc() {
+    const s = formShift();
+    if (!s.start || !s.end) { $("calc").innerHTML = `<p class="hint">Enter your start and finish times.</p>`; return; }
+    const c = calc(s);
+    const overnight = toMin(s.end) <= toMin(s.start);
+    let note;
+    if (c.gap > 0) note = `<div class="notice warn"><b>Ask for ${fmtHM(c.gap)} back.</b> For a ${fmtHM(c.dur)} shift the system takes off a ${c.auto}-minute break automatically. You ${s.breakTaken ? `only took ${c.actualBreak} minutes` : "didn't take a break"}, so a manager needs to adjust it.</div>`;
+    else if (c.gap < 0) note = `<div class="notice bad">Your break (${c.actualBreak}m) was longer than the auto break (${c.auto}m). Expect to be paid ${fmtHM(c.worked)}, not ${fmtHM(c.systemPays)}.</div>`;
+    else note = `<div class="notice good">Nothing to fix. ${c.auto ? `The ${c.auto}-minute auto break matches what you took.` : "Shifts under " + settings.shortFrom + "h get no auto break."}</div>`;
+    $("calc").innerHTML = `
+      <div class="calc-line"><span>Shift length${overnight ? " (overnight)" : ""}</span><b>${fmtHM(c.dur)}</b></div>
+      <div class="calc-line"><span>Auto break the system applies</span><b>${fmtHM(c.auto)}</b></div>
+      <div class="calc-line"><span>Unpaid break you took</span><b>${fmtHM(c.actualBreak)}</b></div>
+      <div class="calc-line calc-total"><span>You should be paid</span><b>${fmtHM(c.worked)} · ${fmtDec(c.worked)}h</b></div>
+      ${settings.rate ? `<div class="calc-line"><span>At £${Number(settings.rate).toFixed(2)}/h</span><b>${money(c.worked / 60 * settings.rate)}</b></div>` : ""}
+      ${note}`;
+  }
+
+  function resetForm() {
+    editingId = null;
+    $("f-date").value = iso(new Date());
+    const last = [...shifts].sort((a, b) => (b.date + b.start).localeCompare(a.date + a.start))[0];
+    if (last) { $("f-start").value = last.start; $("f-end").value = last.end; }
+    $("f-brk").value = settings.shortBreak || 30;
+    $("f-note").value = "";
+    $("from-clock").hidden = true;
+    $("save").textContent = "Save shift"; $("cancel-edit").hidden = true; $("log-h").textContent = "Log a shift";
+    setBreak(true); renderChips();
+  }
+  function loadIntoForm(s) {
+    editingId = s.id;
+    $("f-date").value = s.date; $("f-start").value = s.start; $("f-end").value = s.end;
+    $("f-brk").value = s.breakTaken ? s.breakMins : (settings.shortBreak || 30);
+    $("f-note").value = s.note || "";
+    $("save").textContent = "Update shift"; $("cancel-edit").hidden = false; $("log-h").textContent = "Edit shift";
+    setBreak(!!s.breakTaken); renderChips(); show("log"); window.scrollTo(0, 0);
+  }
+  $("cancel-edit").onclick = () => resetForm();
+
+  $("save").onclick = async () => {
+    const s = formShift();
+    if (!s.date || !s.start || !s.end) { toast("Add the date, start and finish time"); return; }
+    const id = editingId || ("s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+    const prev = shifts.find((x) => x.id === id);
+    const rec = { id, ...s, fixed: prev ? !!prev.fixed : false };
+    await putShift(rec);
+    toast(editingId ? "Shift updated" : "Shift saved");
+    resetForm(); render();
+  };
+
+  // ---------- persistence ops ----------
+  async function putShift(rec) {
+    const i = shifts.findIndex((x) => x.id === rec.id);
+    if (i >= 0) shifts[i] = rec; else shifts.push(rec);
+    if (backend === "db") { try { await refs.shifts.doc(rec.id).set(rec); } catch (e) { toast("Couldn't sync. Saved on this device."); } }
+    saveLocal();
+  }
+  async function removeShift(id) {
+    shifts = shifts.filter((x) => x.id !== id);
+    if (backend === "db") { try { await refs.shifts.doc(id).delete(); } catch (e) {} }
+    saveLocal();
+  }
+  let paidTimer = null;
+  function savePaid() {
+    saveLocal();
+    if (backend !== "db") return;
+    clearTimeout(paidTimer);
+    paidTimer = setTimeout(async () => { try { await refs.paid.set({ weeks: paid }); } catch (e) {} }, 700);
+  }
+  async function saveSettings() {
+    saveLocal();
+    if (backend === "db") { try { await refs.settings.set(settings); } catch (e) {} }
+  }
+
+  // ---------- shifts view ----------
+  let confirmDel = null;
+  function renderShifts() {
+    const weeks = groupWeeks();
+    if (!weeks.length) {
+      $("shift-weeks").innerHTML = `<div class="card empty"><h2>No shifts yet</h2><p>Log your first shift on the Log tab. Each one shows up here, grouped by pay week.</p></div>`;
+      return;
+    }
+    $("shift-weeks").innerHTML = weeks.map(([k, list]) => {
+      let worked = 0, atRisk = 0;
+      list.forEach((s) => { const c = calc(s); worked += c.worked; if (c.gap > 0 && !s.fixed) atRisk += c.gap; });
+      const rows = list.map((s) => {
+        const c = calc(s);
+        let pill = "";
+        if (c.gap > 0) pill = s.fixed
+          ? `<span class="pill good">Break fixed ✓</span>`
+          : `<span class="pill warn">Ask for ${fmtHM(c.gap)} back</span><button type="button" class="link" data-fix="${s.id}">Mark fixed</button>`;
+        else pill = `<span class="pill plain">Break ${c.actualBreak}m</span>`;
+        const del = confirmDel === s.id
+          ? `<button type="button" class="link danger" data-del="${s.id}">Tap again to delete</button>`
+          : `<button type="button" class="link" data-del="${s.id}">Delete</button>`;
+        return `<div class="shift">
+          <div><div class="d">${dayName(s.date)}</div><div class="t">${s.start}–${s.end}</div></div>
+          <div class="h">${fmtHM(c.worked)}<div class="t">${fmtDec(c.worked)}h</div></div>
+          <div class="pills">${pill}<button type="button" class="link" data-edit="${s.id}">Edit</button>${del}</div>
+          ${s.note ? `<div class="pills hint">${esc(s.note)}</div>` : ""}
+        </div>`;
+      }).join("");
+      return `<div class="card">
+        <div class="week-h"><h2>${weekLabel(k)}</h2>${statusPill(k)}</div>
+        <div class="stats">
+          <div class="stat"><div class="v">${fmtDec(worked)}h</div><div class="k">Worked</div></div>
+          <div class="stat"><div class="v">${settings.rate ? money(worked / 60 * settings.rate) : "—"}</div><div class="k">Should earn</div></div>
+          <div class="stat ${atRisk ? "alert" : ""}"><div class="v">${atRisk ? fmtHM(atRisk) : "0"}</div><div class="k">Breaks to fix</div></div>
+        </div>
+        <div class="list">${rows}</div>
+      </div>`;
+    }).join("");
+  }
+  $("shift-weeks").addEventListener("click", async (e) => {
+    const t = e.target.closest("button"); if (!t) return;
+    if (t.dataset.edit) { loadIntoForm(shifts.find((x) => x.id === t.dataset.edit)); return; }
+    if (t.dataset.fix) { const s = shifts.find((x) => x.id === t.dataset.fix); await putShift({ ...s, fixed: true }); toast("Marked as fixed"); render(); return; }
+    if (t.dataset.del) {
+      if (confirmDel === t.dataset.del) { confirmDel = null; await removeShift(t.dataset.del); toast("Shift deleted"); }
+      else confirmDel = t.dataset.del;
+      render();
+    }
+  });
+
+  // ---------- payslip view ----------
+  function renderPay() {
+    const weeks = groupWeeks();
+    if (!weeks.length) { $("pay-weeks").innerHTML = `<div class="card empty"><p>Log some shifts first, then compare them with your payslip here.</p></div>`; return; }
+    $("pay-weeks").innerHTML = weeks.map(([k, list]) => {
+      const worked = list.reduce((a, s) => a + calc(s).worked, 0);
+      const p = paid[k];
+      let result = `<p class="hint">Enter the hours from your payslip to check this week.</p>`;
+      if (p !== undefined && p !== "" && !isNaN(p)) {
+        const diffMin = worked - Number(p) * 60;
+        const cash = settings.rate ? ` (${money(Math.abs(diffMin) / 60 * settings.rate)})` : "";
+        if (Math.abs(diffMin) < 1) result = `<div class="notice good"><b>Paid correctly.</b> Payslip matches the ${fmtDec(worked)}h you worked.</div>`;
+        else if (diffMin > 0) result = `<div class="notice warn"><b>Underpaid by ${fmtHM(diffMin)}${cash}.</b> You worked ${fmtDec(worked)}h but were paid ${Number(p).toFixed(2)}h. Show your manager the shifts below.</div>`;
+        else result = `<div class="notice bad"><b>Paid ${fmtHM(-diffMin)} more than logged${cash}.</b> Check you've logged every shift this week.</div>`;
+      }
+      const lines = list.map((s) => { const c = calc(s);
+        return `<div class="calc-line"><span>${dayName(s.date)} · ${s.start}–${s.end}${s.breakTaken ? ` · ${c.actualBreak}m break` : " · no break"}</span><b>${fmtDec(c.worked)}h</b></div>`; }).join("");
+      return `<div class="card">
+        <div class="week-h"><h2>${weekLabel(k)}</h2>${statusPill(k)}</div>
+        <div class="row2">
+          <div class="field"><label class="label" for="p-${k}">Hours on payslip</label>
+            <input type="number" inputmode="decimal" step="0.01" min="0" id="p-${k}" data-week="${k}" value="${p ?? ""}" placeholder="${fmtDec(worked)}"></div>
+          <div class="field"><span class="label">Should be</span><div class="num" style="font-size:1.3rem;padding-top:10px">${fmtDec(worked)}h${settings.rate ? `<div class="hint">${money(worked / 60 * settings.rate)}</div>` : ""}</div></div>
+        </div>
+        <div data-result="${k}">${result}</div>
+        <div class="calc">${lines}</div>
+      </div>`;
+    }).join("");
+  }
+  $("pay-weeks").addEventListener("change", (e) => {
+    const inp = e.target.closest("[data-week]"); if (!inp) return;
+    const v = inp.value.trim();
+    if (v === "") delete paid[inp.dataset.week]; else paid[inp.dataset.week] = Number(v);
+    savePaid(); renderPay();
+    const again = $("p-" + inp.dataset.week); if (again) again.focus();
+  });
+
+  // ---------- settings ----------
+  function setWeek(n) { $("wk-mon").setAttribute("aria-pressed", n === 1); $("wk-sun").setAttribute("aria-pressed", n === 0); }
+  let pendingWeek = 1;
+  $("wk-mon").onclick = () => { pendingWeek = 1; setWeek(1); };
+  $("wk-sun").onclick = () => { pendingWeek = 0; setWeek(0); };
+  function fillSettings() {
+    $("s-rate").value = settings.rate ?? "";
+    $("s-round").value = String(settings.round ?? 15);
+    $("s-name").value = settings.name || ""; $("s-emp").value = settings.emp || ""; $("s-site").value = settings.site || "";
+    $("s-lf").value = settings.longFrom; $("s-lb").value = settings.longBreak;
+    $("s-sf").value = settings.shortFrom; $("s-sb").value = settings.shortBreak;
+    $("rule-hint").textContent = `${settings.longFrom}h or more: ${settings.longBreak} min taken off. ${settings.shortFrom}h to under ${settings.longFrom}h: ${settings.shortBreak} min. Under ${settings.shortFrom}h: no break. If you didn't take the break, the app tells you how much to ask for back.`;
+    pendingWeek = settings.weekStart; setWeek(settings.weekStart);
+  }
+  $("s-save").onclick = async () => {
+    const r = $("s-rate").value.trim();
+    settings = { rate: r === "" ? null : Number(r), round: Number($("s-round").value),
+      name: $("s-name").value.trim(), emp: $("s-emp").value.trim(), site: $("s-site").value.trim(),
+      longFrom: Number($("s-lf").value) || 0, longBreak: Number($("s-lb").value) || 0,
+      shortFrom: Number($("s-sf").value) || 0, shortBreak: Number($("s-sb").value) || 0,
+      weekStart: pendingWeek, v: 3 };
+    await saveSettings(); fillSettings(); toast("Settings saved"); render();
+  };
+
+  // ---------- nav ----------
+  let view = "log";
+  function show(v) {
+    view = v;
+    ["log", "shifts", "pay", "report", "set"].forEach((n) => { $("view-" + n).hidden = n !== v; });
+    document.querySelectorAll("nav.tabs button").forEach((b) => { if (b.dataset.view === v) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
+    if (v === "set") fillSettings();
+    render();
+  }
+  document.querySelector("nav.tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-view]"); if (b) { confirmDel = null; show(b.dataset.view); window.scrollTo(0, 0); } });
+
+  // ---------- clock in / break / clock out ----------
+  // active = { in: ms, breaks: [{ s: ms, e: ms|null }] } while a shift is running
+  let active = null;
+  const MIN_SHIFT_MS = 5 * 60 * 1000;   // clocking out sooner than this asks before saving
+  const MIN_BREAK_MS = 60 * 1000;       // breaks shorter than this are treated as mis-taps
+  const hhmm = (d) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  function roundHHMM(ms) {
+    const d = new Date(ms);
+    const step = Number(settings.round) || 0;
+    let m = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
+    m = step ? Math.round(m / step) * step : Math.round(m);
+    m = ((m % 1440) + 1440) % 1440;
+    return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+  }
+  const onBreak = () => !!(active && active.breaks.length && active.breaks[active.breaks.length - 1].e == null);
+  const breakMs = (now) => (active ? active.breaks.reduce((a, b) => a + ((b.e ?? now) - b.s), 0) : 0);
+  const fmtClock = (ms) => { const t = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(t / 3600)}:${String(Math.floor(t / 60) % 60).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`; };
+
+  async function saveActive() {
+    active ? store.set(LS + ":active", JSON.stringify(active)) : store.del(LS + ":active");
+    notifyClock();
+    if (backend === "db") { try { active ? await refs.active.set(active) : await refs.active.delete(); } catch (e) { toast("Couldn't sync the clock. It's saved on this device."); } }
+  }
+  function loadActiveLocal() { try { const a = JSON.parse(store.get(LS + ":active") || "null"); if (a && a.in) active = a; } catch (e) {} }
+
+  function renderClock() {
+    const card = $("clock"), now = Date.now();
+    card.classList.toggle("on", !!active && !onBreak());
+    card.classList.toggle("brk", onBreak());
+    $("clock-edit-wrap").hidden = !active;
+    if (!active) {
+      $("clock-state").textContent = "Not clocked in"; $("clock-state").className = "pill plain";
+      $("clock-timer").textContent = "0:00:00";
+      $("clock-sub").textContent = settings.round
+        ? `Tap Clock in when your shift starts. Times are rounded to the nearest ${settings.round} minutes, and you can change them before saving.`
+        : "Tap Clock in when your shift starts. You can change the times before saving.";
+      $("clock-btns").innerHTML = `<button type="button" class="primary" data-clock="in">Clock in</button>`;
+      return;
+    }
+    const inD = new Date(active.in);
+    if (document.activeElement !== $("clock-in-edit")) $("clock-in-edit").value = hhmm(inD);
+    const b = breakMs(now);
+    if (onBreak()) {
+      const cur = active.breaks[active.breaks.length - 1];
+      $("clock-state").textContent = "On break"; $("clock-state").className = "pill warn";
+      $("clock-timer").textContent = fmtClock(now - cur.s);
+      $("clock-sub").textContent = `Break started ${hhmm(new Date(cur.s))}. Total break today ${Math.round(b / 60000)} min. Shift started ${hhmm(inD)}.`;
+      $("clock-btns").innerHTML = `<button type="button" class="warnbtn" data-clock="endbreak">End break</button>`;
+    } else {
+      $("clock-state").textContent = "Clocked in"; $("clock-state").className = "pill good";
+      $("clock-timer").textContent = fmtClock(now - active.in - b);
+      $("clock-sub").textContent = `In at ${hhmm(inD)} (counts as ${roundHHMM(active.in)}). ${b ? `Breaks so far ${Math.round(b / 60000)} min.` : "No break yet."}`;
+      $("clock-btns").innerHTML = `<button type="button" class="ghost big" data-clock="break">Start break</button><button type="button" class="primary" data-clock="out">Clock out</button>`;
+    }
+  }
+
+  $("clock-btns").addEventListener("click", async (e) => {
+    const t = e.target.closest("[data-clock]"); if (!t) return;
+    const now = Date.now(), act = t.dataset.clock;
+    if (act === "in") { active = { in: now, breaks: [] }; toast(`Clocked in at ${hhmm(new Date(now))}`); }
+    else if (act === "break") { active.breaks.push({ s: now, e: null }); toast("Break started"); }
+    else if (act === "endbreak") {
+      const b = active.breaks[active.breaks.length - 1]; b.e = now;
+      // A break under a minute is almost certainly a mis-tap: drop it.
+      if (now - b.s < MIN_BREAK_MS) { active.breaks.pop(); toast("Break under 1 minute ignored"); } else toast("Break ended");
+    }
+    else if (act === "out" && now - active.in < MIN_SHIFT_MS) {
+      const mins = Math.max(0, Math.floor((now - active.in) / 60000));
+      $("clock-sub").textContent = `You clocked in only ${mins ? mins + " min" : "a few seconds"} ago. Looks like a mistake.`;
+      $("clock-btns").innerHTML = `<button type="button" class="primary" data-clock="discard">Discard it</button><button type="button" class="ghost big" data-clock="out-keep">Keep it</button><button type="button" class="ghost big" data-clock="back">Keep working</button>`;
+      return;
+    }
+    else if (act === "discard") { active = null; toast("Clock-in discarded"); }
+    else if (act === "back") { /* just re-render the running clock */ }
+    else if (act === "out" || act === "out-keep") {
+      if (onBreak()) active.breaks[active.breaks.length - 1].e = now;
+      const brkMin = Math.round(breakMs(now) / 60000);
+      resetForm();
+      $("f-date").value = iso(new Date(active.in));
+      $("f-start").value = roundHHMM(active.in);
+      $("f-end").value = roundHHMM(now);
+      $("f-brk").value = brkMin || (settings.shortBreak || 30);
+      setBreak(brkMin > 0); renderChips();
+      const roundTxt = settings.round ? ` Rounded to the nearest ${settings.round} min.` : "";
+      $("from-clock").innerHTML = `<b>From the clock:</b> in ${hhmm(new Date(active.in))}, out ${hhmm(new Date(now))}, ${brkMin ? `${brkMin} min break` : "no break"}.${roundTxt} Check the times above, change anything that's wrong, then tap Save shift.`;
+      $("from-clock").hidden = false;
+      active = null;
+      toast("Clocked out. Review and save.");
+      setTimeout(() => $("save").scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+    }
+    renderClock(); renderCalc(); await saveActive();
+  });
+
+  $("clock-in-edit").addEventListener("change", async (e) => {
+    if (!active || !e.target.value) return;
+    const [h, m] = e.target.value.split(":").map(Number);
+    const d = new Date(active.in); d.setHours(h, m, 0, 0);
+    if (d.getTime() > Date.now()) d.setDate(d.getDate() - 1);
+    active.in = d.getTime(); toast(`Clock-in changed to ${e.target.value}`);
+    renderClock(); await saveActive();
+  });
+  setInterval(() => { if (active && view === "log" && !$("clock-btns").querySelector('[data-clock="discard"]')) renderClock(); }, 1000);
+
+  // ---------- weekly report ----------
+  let reportWeek = null;
+  function reportData(k) {
+    const days = [];
+    for (let i = 0; i < 7; i++) { const d = parseDate(k); d.setDate(d.getDate() + i); days.push(iso(d)); }
+    const rows = [];
+    let tDur = 0, tBrk = 0, tWorked = 0, tFix = 0;
+    days.forEach((ds) => {
+      const list = shifts.filter((s) => s.date === ds).sort((a, b) => a.start.localeCompare(b.start));
+      const dlabel = parseDate(ds).toLocaleDateString("en-GB", { weekday: "long" });
+      const dshort = parseDate(ds).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+      if (!list.length) { rows.push({ off: true, day: dlabel, date: dshort }); return; }
+      list.forEach((s) => {
+        const c = calc(s);
+        tDur += c.dur; tBrk += c.actualBreak; tWorked += c.worked;
+        let action = "None";
+        if (c.gap > 0) { action = s.fixed ? `Auto break adjusted (${fmtHM(c.gap)} added back)` : `Remove ${fmtHM(c.gap)} of auto break`; if (!s.fixed) tFix += c.gap; }
+        else if (c.gap < 0) action = `Break ${fmtHM(-c.gap)} longer than auto break`;
+        rows.push({ day: dlabel, date: dshort, start: s.start, end: s.end, dur: fmtHM(c.dur),
+          brk: s.breakTaken && c.actualBreak ? `Yes, ${c.actualBreak} min` : "No break",
+          auto: c.auto ? `${c.auto} min` : "None", paid: fmtDec(c.worked), action, flag: c.gap > 0 && !s.fixed, note: s.note || "" });
+      });
+    });
+    const p = paid[k];
+    return { k, rows, tDur, tBrk, tWorked, tFix, payslip: p, count: rows.filter((r) => !r.off).length };
+  }
+
+  function renderReport() {
+    const weeks = groupWeeks().map(([k]) => k);
+    const thisK = weekKey(iso(new Date()));
+    if (!weeks.includes(thisK)) weeks.unshift(thisK);
+    weeks.sort((a, b) => b.localeCompare(a));
+    if (!reportWeek || !weeks.includes(reportWeek)) {
+      const lastDone = weeks.find((k) => weekDone(k));
+      reportWeek = lastDone && groupWeeks().some(([w]) => w === lastDone) ? lastDone : weeks[0];
+    }
+    $("r-week").innerHTML = weeks.map((k) => `<option value="${k}" ${k === reportWeek ? "selected" : ""}>${weekLabel(k)}${weekDone(k) ? "" : " (in progress)"}</option>`).join("");
+    const r = reportData(reportWeek);
+    const who = [["Name", settings.name || "Not set (add it in Settings)"]];
+    if (settings.emp) who.push(["Employee no.", settings.emp]);
+    if (settings.site) who.push(["Site", settings.site]);
+    who.push(["Pay week", weekLabel(reportWeek)]);
+    const diff = r.payslip !== undefined ? r.tWorked - Number(r.payslip) * 60 : null;
+    $("r-preview").innerHTML = `
+      <h3>Weekly hours report</h3>
+      <dl>${who.map(([a, b]) => `<dt>${a}</dt><dd>${esc(b)}</dd>`).join("")}</dl>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Day</th><th>Date</th><th>Start</th><th>Finish</th><th>Shift</th><th>Break taken</th><th>Auto break</th><th>Paid hrs</th><th>Action needed</th></tr></thead>
+        <tbody>${r.rows.map((x) => x.off
+          ? `<tr class="off"><td>${x.day}</td><td>${x.date}</td><td colspan="7">No shift</td></tr>`
+          : `<tr><td>${x.day}</td><td>${x.date}</td><td class="n">${x.start}</td><td class="n">${x.end}</td><td class="n">${x.dur}</td><td>${x.brk}</td><td>${x.auto}</td><td class="n">${x.paid}</td><td class="${x.flag ? "flag" : ""}">${x.action}${x.note ? `<div class="foot">${esc(x.note)}</div>` : ""}</td></tr>`).join("")}
+          <tr class="tot"><td colspan="4">Total (${r.count} shift${r.count === 1 ? "" : "s"})</td><td class="n">${fmtHM(r.tDur)}</td><td>${fmtHM(r.tBrk)}</td><td></td><td class="n">${fmtDec(r.tWorked)}</td><td>${r.tFix ? `Remove ${fmtHM(r.tFix)}` : ""}</td></tr>
+        </tbody></table></div>
+      <dl>
+        <dt>Hours to be paid</dt><dd>${fmtDec(r.tWorked)} h (${fmtHM(r.tWorked)})</dd>
+        ${settings.rate ? `<dt>Expected pay</dt><dd>${money(r.tWorked / 60 * settings.rate)} at £${Number(settings.rate).toFixed(2)}/h</dd>` : ""}
+        ${r.tFix ? `<dt>Auto break to remove</dt><dd style="color:var(--warn)">${fmtHM(r.tFix)}</dd>` : ""}
+        ${diff !== null ? `<dt>Hours on payslip</dt><dd>${Number(r.payslip).toFixed(2)} h</dd><dt>Difference</dt><dd>${Math.abs(diff) < 1 ? "None" : (diff > 0 ? `${fmtHM(diff)} underpaid` : `${fmtHM(-diff)} overpaid`)}${diff >= 1 && settings.rate ? ` (${money(diff / 60 * settings.rate)})` : ""}</dd>` : ""}
+      </dl>
+      <p class="foot">Breaks are unpaid. "No break" means no break was taken, so the automatic deduction should be removed for that shift. Report created ${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}.</p>`;
+  }
+  $("r-week").addEventListener("change", (e) => { reportWeek = e.target.value; renderReport(); });
+
+  function reportText(r) {
+    const L = [];
+    L.push(`WEEKLY HOURS REPORT`);
+    L.push(`Name: ${settings.name || "-"}${settings.emp ? `  |  Employee no.: ${settings.emp}` : ""}${settings.site ? `  |  Site: ${settings.site}` : ""}`);
+    L.push(`Pay week: ${weekLabel(r.k)}`, "");
+    r.rows.forEach((x) => {
+      if (x.off) { L.push(`${x.day} ${x.date}: No shift`); return; }
+      L.push(`${x.day} ${x.date}: ${x.start}-${x.end} (${x.dur}) | Break: ${x.brk} | Paid: ${x.paid} h${x.action !== "None" ? ` | ${x.action}` : ""}${x.note ? ` | Note: ${x.note}` : ""}`);
+    });
+    L.push("", `Total hours to be paid: ${fmtDec(r.tWorked)} h (${fmtHM(r.tWorked)})`);
+    if (settings.rate) L.push(`Expected pay: ${money(r.tWorked / 60 * settings.rate)}`);
+    if (r.tFix) L.push(`Auto break still to remove: ${fmtHM(r.tFix)}`);
+    if (r.payslip !== undefined) { const d = r.tWorked - Number(r.payslip) * 60; L.push(`Hours on payslip: ${Number(r.payslip).toFixed(2)} h  |  Difference: ${Math.abs(d) < 1 ? "none" : d > 0 ? fmtHM(d) + " underpaid" : fmtHM(-d) + " overpaid"}`); }
+    return L.join("\n").replace(/−/g, "-");
+  }
+  $("r-copy").onclick = async () => {
+    const txt = reportText(reportData(reportWeek));
+    if (Native) { try { Native.copyText(txt); toast("Report copied"); return; } catch (e) {} }
+    try { await navigator.clipboard.writeText(txt); toast("Report copied"); }
+    catch (e) {
+      const ta = document.createElement("textarea"); ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); toast("Report copied"); } catch (_) { toast("Couldn't copy. Try again."); } ta.remove();
+    }
+  };
+
+  let downloads = null;
+  function buildPdf(r) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const clean = (s) => String(s).replace(/−/g, "-");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.text("Weekly hours report", 14, 18);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10.5);
+    const meta = [`Name: ${settings.name || "-"}`];
+    if (settings.emp) meta.push(`Employee no.: ${settings.emp}`);
+    if (settings.site) meta.push(`Site: ${settings.site}`);
+    meta.push(`Pay week: ${weekLabel(r.k)}`);
+    doc.text(meta.join("     "), 14, 26);
+    doc.autoTable({
+      startY: 32,
+      head: [["Day", "Date", "Start", "Finish", "Shift", "Break taken", "Auto break", "Paid hrs", "Action needed"]],
+      body: r.rows.map((x) => x.off ? [x.day, x.date, { content: "No shift", colSpan: 7, styles: { textColor: [130, 140, 150] } }]
+        : [x.day, x.date, x.start, x.end, clean(x.dur), x.brk, x.auto, x.paid, clean(x.action) + (x.note ? `\nNote: ${x.note}` : "")]),
+      foot: [[{ content: `Total (${r.count} shift${r.count === 1 ? "" : "s"})`, colSpan: 4 }, clean(fmtHM(r.tDur)), clean(fmtHM(r.tBrk)), "", fmtDec(r.tWorked), r.tFix ? `Remove ${clean(fmtHM(r.tFix))}` : ""]],
+      styles: { font: "helvetica", fontSize: 9.5, cellPadding: 2.5 },
+      headStyles: { fillColor: [22, 80, 122] },
+      footStyles: { fillColor: [220, 234, 244], textColor: [20, 36, 51] },
+      columnStyles: { 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" }, 7: { halign: "right" }, 8: { cellWidth: 70 } },
+      didParseCell: (d) => { if (d.section === "body" && d.column.index === 8) { const row = r.rows[d.row.index]; if (row && row.flag) { d.cell.styles.textColor = [154, 75, 0]; d.cell.styles.fontStyle = "bold"; } } },
+    });
+    let y = doc.lastAutoTable.finalY + 8;
+    doc.setFontSize(11);
+    const lines = [`Hours to be paid: ${fmtDec(r.tWorked)} h (${clean(fmtHM(r.tWorked))})`];
+    if (settings.rate) lines.push(`Expected pay: ${clean(money(r.tWorked / 60 * settings.rate))} at £${Number(settings.rate).toFixed(2)}/h`);
+    if (r.tFix) lines.push(`Auto break still to remove: ${clean(fmtHM(r.tFix))}`);
+    if (r.payslip !== undefined) { const d = r.tWorked - Number(r.payslip) * 60; lines.push(`Hours on payslip: ${Number(r.payslip).toFixed(2)} h   Difference: ${Math.abs(d) < 1 ? "none" : d > 0 ? clean(fmtHM(d)) + " underpaid" : clean(fmtHM(-d)) + " overpaid"}`); }
+    lines.forEach((t) => { doc.text(t, 14, y); y += 6; });
+    doc.setFontSize(9); doc.setTextColor(100, 110, 120);
+    doc.text(`Breaks are unpaid. "No break" means no break was taken, so the automatic deduction should be removed for that shift. Created ${new Date().toLocaleDateString("en-GB")}.`, 14, y + 4);
+    return doc.output("blob");
+  }
+  $("r-pdf").onclick = async () => {
+    if ((!downloads && !Native) || !window.jspdf) { toast("PDF isn't available here. Use Copy as text."); return; }
+    const r = reportData(reportWeek);
+    const end = weekEnd(reportWeek);
+    const who = (settings.name || "hours").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    if (Native) {
+      try { const b64 = await blobToB64(buildPdf(r)); if (!Native.saveFile(`${who}-weekly-report-${reportWeek}-to-${end}.pdf`, b64, "application/pdf", true)) throw new Error("save failed"); toast("PDF saved to Downloads"); }
+      catch (e) { toast("Couldn't save the PDF. Use Share or Copy as text."); }
+      return;
+    }
+    try { await downloads.save({ filename: `${who}-weekly-report-${reportWeek}-to-${end}.pdf`, data: buildPdf(r) }); toast("PDF saved"); }
+    catch (e) { if (e && e.code === "declined") return; if (e && e.code === "rate_limited") toast("Finish the open save first"); else toast("Couldn't save the PDF. Use Copy as text."); }
+  };
+
+  function blobToB64(blob) {
+    return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(",")[1]); fr.onerror = rej; fr.readAsDataURL(blob); });
+  }
+  const utf8B64 = (str) => blobToB64(new Blob([str], { type: "text/plain" }));
+  $("r-share").onclick = () => { try { Native.shareText(reportText(reportData(reportWeek)), "Weekly hours report " + weekLabel(reportWeek)); } catch (e) { toast("Couldn't open sharing"); } };
+
+  // Ongoing notification in the Android app while clocked in.
+  function notifyClock() {
+    if (!Native) return;
+    try {
+      if (!active) { Native.clearClockNotification(); return; }
+      if (onBreak()) { const b = active.breaks[active.breaks.length - 1]; Native.clockNotification("On break", `Break started ${hhmm(new Date(b.s))}. Tap End break when you're back.`, b.s); }
+      else Native.clockNotification("Clocked in", `Shift started ${hhmm(new Date(active.in))}. Don't forget to clock out.`, active.in);
+    } catch (e) {}
+  }
+
+  // ---------- backup ----------
+  $("b-export").onclick = async () => {
+    const json = JSON.stringify({ app: "shift-pay-check", v: 1, exported: new Date().toISOString(), settings, shifts, paid }, null, 2);
+    const name = `shift-pay-check-backup-${iso(new Date())}.json`;
+    try {
+      if (Native) { if (!Native.saveFile(name, await utf8B64(json), "application/json", true)) throw new Error("save failed"); toast("Backup saved to Downloads"); return; }
+      if (downloads) { await downloads.save({ filename: name, data: json }); toast("Backup saved"); return; }
+    } catch (e) { if (e && e.code === "declined") return; }
+    toast("Couldn't save the backup");
+  };
+  $("b-import").onclick = () => $("b-file").click();
+  $("b-file").addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0]; e.target.value = "";
+    if (!f) return;
+    let d;
+    try { d = JSON.parse(await f.text()); } catch (err) { toast("That file isn't a Shift Pay Check backup"); return; }
+    if (!d || d.app !== "shift-pay-check" || !Array.isArray(d.shifts)) { toast("That file isn't a Shift Pay Check backup"); return; }
+    const valid = d.shifts.filter((s) => s && s.id && /^\d{4}-\d{2}-\d{2}$/.test(s.date) && /^\d{2}:\d{2}$/.test(s.start) && /^\d{2}:\d{2}$/.test(s.end));
+    for (const s of valid) await putShift({ id: String(s.id), date: s.date, start: s.start, end: s.end, breakTaken: !!s.breakTaken, breakMins: Number(s.breakMins) || 0, fixed: !!s.fixed, note: String(s.note || "") });
+    if (d.settings) { settings = norm({ ...settings, ...d.settings }); await saveSettings(); fillSettings(); }
+    if (d.paid && typeof d.paid === "object") { paid = { ...paid, ...d.paid }; savePaid(); }
+    toast(`Imported ${valid.length} shift${valid.length === 1 ? "" : "s"}`); render();
+  });
+
+  function render() { renderCalc(); if (view === "log") { renderWeekly(); renderClock(); } if (view === "report") renderReport(); if (view === "shifts") renderShifts(); if (view === "pay") renderPay(); }
+
+  let toastT;
+  function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => (t.hidden = true), 2200); }
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  // ---------- boot ----------
+  loadLocal(); loadActiveLocal(); resetForm(); render();
+  if (Native) {
+    $("sync").textContent = "Saved on this phone";
+    $("b-export").hidden = false; $("r-share").hidden = false;
+    if (window.jspdf) { $("r-pdf").hidden = false; $("r-pdf").textContent = "Save PDF"; $("r-hint").textContent = "Save a PDF to your phone, share the report straight to WhatsApp or email, or copy it as text."; }
+    notifyClock();
+    $("install-hint").hidden = true;
+  }
+
+  (async () => {
+    if (!window.claude || !window.claude.use) return;
+    try {
+      downloads = await window.claude.use("downloads");
+      if (downloads) $("b-export").hidden = false;
+      if (downloads && window.jspdf) { $("r-pdf").hidden = false; $("r-hint").textContent = "Download a PDF to email or print, or copy the text into an email, Teams or WhatsApp."; }
+    } catch (e) {}
+    try {
+      const [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+      if (!db || !user) return;
+      const uid = await user.id();
+      if (!uid) return;
+      const base = "data/users/" + uid;
+      refs = {
+        settings: db.doc(base + "/settings"),
+        paid: db.doc(base + "/payslips"),
+        shifts: db.doc(base + "/profile").collection("shifts"),
+        active: db.doc(base + "/clock"),
+      };
+      const localActive = active;
+      const localShifts = shifts.slice(), localSettings = { ...settings }, localPaid = { ...paid };
+      const [sSnap, pSnap, shSnap] = await Promise.all([refs.settings.get(), refs.paid.get(), refs.shifts.get()]);
+      backend = "db";
+      let firstShiftSnap = true;
+      $("sync").textContent = "Synced to your account";
+      // First time on cloud: move anything saved on this device across.
+      if (shSnap.empty && localShifts.length) { for (const s of localShifts) { try { await refs.shifts.doc(s.id).set(s); } catch (e) {} } }
+      if (!sSnap.exists && store.get(LS)) { try { await refs.settings.set(localSettings); } catch (e) {} }
+      if (!pSnap.exists && Object.keys(localPaid).length) { try { await refs.paid.set({ weeks: localPaid }); } catch (e) {} }
+
+      const aSnap = await refs.active.get();
+      if (!aSnap.exists && localActive) { try { await refs.active.set(localActive); } catch (e) {} }
+      refs.active.onSnapshot((snap) => {
+        active = snap.exists && snap.data().in ? JSON.parse(JSON.stringify(snap.data())) : null;
+        active ? store.set(LS + ":active", JSON.stringify(active)) : store.del(LS + ":active");
+        if (view === "log") renderClock();
+      }, () => {});
+      refs.settings.onSnapshot((snap) => { if (snap.exists) { settings = norm(snap.data()); saveLocal(); if (view === "set") fillSettings(); render(); } }, () => {});
+      refs.paid.onSnapshot((snap) => { if (snap.exists) { paid = { ...(snap.data().weeks || {}) }; saveLocal(); if (view === "pay" && !document.activeElement?.dataset?.week) renderPay(); } }, () => {});
+      refs.shifts.onSnapshot((snap) => { shifts = snap.docs.map((d) => ({ ...d.data() })); saveLocal(); if (firstShiftSnap && !editingId && !localShifts.length) { firstShiftSnap = false; const keep = $("f-date").value; resetForm(); $("f-date").value = keep; } firstShiftSnap = false; render(); }, () => {});
+    } catch (e) {
+      backend = "local";
+      $("sync").textContent = "Saved on this device";
+    }
+  })();
+})();
+</script>
